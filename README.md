@@ -50,16 +50,9 @@ A browser-based practice app for **Singapore Primary 6** students to build fluen
 
 ---
 
-## Screenshots
+## Demo
 
-Add screenshots or GIFs here.
-
-```md
-![Home page](./screenshots/home.png)
-![Decimal rounding](./screenshots/rounding.png)
-![Mixed to improper](./screenshots/mixed-fractions.png)
-![Percent hundred square](./screenshots/percent-grid.png)
-```
+View public link on vercel here https://foundation-p6-math.vercel.app/
 
 ---
 
