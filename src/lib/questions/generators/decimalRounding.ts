@@ -14,7 +14,10 @@ export function generateDecimalRounding(seed: number): DecimalRoundingQuestion {
   const scale = roundPlace === "tenth" ? 10 : 100;
 
   const intPart = randInt(rng, 0, 15);
-  const dp = randInt(rng, 2, 4);
+  /** Must have at least one more dp than the rounding target (e.g. 3+ dp when rounding to hundredths). */
+  const minDp = roundPlace === "tenth" ? 2 : 3;
+  const maxDpExclusive = 6;
+  const dp = randInt(rng, minDp, maxDpExclusive);
   const divisor = 10 ** dp;
   const numerator = randInt(rng, 1, divisor - 1);
   const value = intPart + numerator / divisor;
