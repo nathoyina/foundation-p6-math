@@ -20,9 +20,12 @@ export interface BaseQuestion {
 export interface DecimalRoundingQuestion extends BaseQuestion {
   skillId: "decimal-rounding";
   value: number;
+  /** How many decimal places are shown in the prompt (always > rounding target). */
+  sourceDp: number;
   roundPlace: RoundPlace;
-  tickValues: number[];
   correctRounded: number;
+  /** Shuffled choices for step 2 (includes correct answer). */
+  answerChoices: number[];
 }
 
 export interface MixedToImproperQuestion extends BaseQuestion {

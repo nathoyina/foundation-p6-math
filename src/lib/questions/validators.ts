@@ -1,4 +1,5 @@
 import { fractionsEqual, simplify, type Fraction } from "@/lib/math/fractions";
+import { roundPlaceToColumn, type DecimalPlace } from "@/lib/math/placeValue";
 import type {
   DecimalRoundingQuestion,
   MixedToImproperQuestion,
@@ -12,6 +13,14 @@ export function validateDecimalRounding(
   selected: number,
 ): boolean {
   return Math.abs(selected - q.correctRounded) < EPS;
+}
+
+export function validateRoundingPlace(
+  q: DecimalRoundingQuestion,
+  selected: DecimalPlace,
+): boolean {
+  const expected = roundPlaceToColumn(q.roundPlace);
+  return selected === expected;
 }
 
 export function validateMixedToImproper(

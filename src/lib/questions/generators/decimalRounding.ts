@@ -1,4 +1,9 @@
-import { decimalPlacesForRounding, roundToPlace, type RoundPlace } from "@/lib/math/rounding";
+import {
+  decimalPlacesForRounding,
+  placeScale,
+  roundToPlace,
+  type RoundPlace,
+} from "@/lib/math/rounding";
 import { mulberry32, randInt } from "../rng";
 import type { DecimalRoundingQuestion, Difficulty } from "../types";
 
@@ -8,13 +13,60 @@ function inferDifficulty(place: RoundPlace, dp: number): Difficulty {
   return "easy";
 }
 
+function snapToRoundPlace(n: number, roundPlace: RoundPlace): number {
+  return roundToPlace(n, roundPlace);
+}
+
+function buildAnswerChoices(
+  value: number,
+  roundPlace: RoundPlace,
+  correctRaw: number,
+  rng: () => number,
+): number[] {
+  const scale = placeScale(roundPlace);
+  const correct = snapToRoundPlace(correctRaw, roundPlace);
+  const pool = new Set<number>([correct]);
+
+  const tryAdd = (n: number) => {
+    pool.add(snapToRoundPlace(n, roundPlace));
+  };
+
+  tryAdd(Math.floor(value * scale) / scale);
+
+  const finerScale = roundPlace === "tenth" ? 100 : 1000;
+  tryAdd(Math.round(value * finerScale) / finerScale);
+
+  const step = 1 / scale;
+  tryAdd(correct + step);
+  tryAdd(correct - step);
+  tryAdd(Math.round(value));
+
+  let nudge = 2;
+  while (pool.size < 6 && nudge < 20) {
+    tryAdd(correct + nudge * step);
+    tryAdd(correct - nudge * step);
+    nudge += 1;
+  }
+
+  const distractors = [...pool].filter((n) => Math.abs(n - correct) > 1e-9);
+  for (let i = distractors.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [distractors[i], distractors[j]] = [distractors[j]!, distractors[i]!];
+  }
+
+  const picked = [correct, ...distractors.slice(0, 3)];
+  for (let i = picked.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [picked[i], picked[j]] = [picked[j]!, picked[i]!];
+  }
+  return picked;
+}
+
 export function generateDecimalRounding(seed: number): DecimalRoundingQuestion {
   const rng = mulberry32(seed);
   const roundPlace: RoundPlace = rng() < 0.55 ? "tenth" : "hundredth";
-  const scale = roundPlace === "tenth" ? 10 : 100;
 
   const intPart = randInt(rng, 0, 15);
-  /** Must have at least one more dp than the rounding target (e.g. 3+ dp when rounding to hundredths). */
   const minDp = roundPlace === "tenth" ? 2 : 3;
   const maxDpExclusive = 6;
   const dp = randInt(rng, minDp, maxDpExclusive);
@@ -23,16 +75,8 @@ export function generateDecimalRounding(seed: number): DecimalRoundingQuestion {
   const value = intPart + numerator / divisor;
 
   const correctRounded = roundToPlace(value, roundPlace);
+  const answerChoices = buildAnswerChoices(value, roundPlace, correctRounded, rng);
 
-  const lower = Math.floor(value * scale - 3) / scale;
-  const upper = Math.ceil(value * scale + 3) / scale;
-  const ticks: number[] = [];
-  for (let x = lower; x <= upper + 1e-9; x += 1 / scale) {
-    const t = Math.round(x * scale) / scale;
-    if (ticks.length === 0 || ticks[ticks.length - 1] !== t) ticks.push(t);
-  }
-
-  /** Alternate between place-value wording and “decimal places” wording (same maths). */
   const useNearestPlaceLanguage = rng() < 0.5;
 
   const prompt =
@@ -50,13 +94,19 @@ export function generateDecimalRounding(seed: number): DecimalRoundingQuestion {
     difficulty: inferDifficulty(roundPlace, dp),
     prompt,
     value,
+    sourceDp: dp,
     roundPlace,
-    tickValues: ticks,
     correctRounded,
+    answerChoices,
   };
 }
 
 export function formatValueDp(value: number, roundPlace: RoundPlace): string {
   const dp = decimalPlacesForRounding(roundPlace);
   return value.toFixed(dp);
+}
+
+/** Format a rounded answer for display at the target precision. */
+export function formatAnswerChoice(value: number, roundPlace: RoundPlace): string {
+  return snapToRoundPlace(value, roundPlace).toFixed(decimalPlacesForRounding(roundPlace));
 }
