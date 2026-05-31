@@ -7,6 +7,7 @@ import type {
 } from "./types";
 
 const EPS = 1e-9;
+const PCT_EPS = 0.05;
 
 export function validateDecimalRounding(
   q: DecimalRoundingQuestion,
@@ -29,6 +30,23 @@ export function validateMixedToImproper(
 ): boolean {
   if (student.den === 0) return false;
   return fractionsEqual(simplify(student), simplify(q.answer));
+}
+
+export function validateImproperToMixed(
+  q: MixedToImproperQuestion,
+  wholeStr: string,
+  numStr: string,
+  denStr: string,
+): boolean {
+  if (!q.answerMixed) return false;
+  const whole = Number(wholeStr);
+  const num = Number(numStr);
+  const den = Number(denStr);
+  if (!Number.isFinite(whole) || !Number.isFinite(num) || !Number.isFinite(den) || den === 0) {
+    return false;
+  }
+  const a = q.answerMixed;
+  return whole === a.whole && num === a.num && den === a.den;
 }
 
 export function parseFractionInput(numStr: string, denStr: string): Fraction | null {
@@ -62,13 +80,15 @@ export function validatePercentConvert(
       const raw = input.percentStr?.trim().replace(/%/g, "") ?? "";
       const v = Number(raw);
       if (!Number.isFinite(v) || q.expectedPercent === undefined) return false;
-      return Math.abs(v - q.expectedPercent) < EPS;
+      const tol = q.level === "level2" ? PCT_EPS : EPS;
+      return Math.abs(v - q.expectedPercent) < tol;
     }
     case "fraction-to-pct": {
       const raw = input.percentStr?.trim().replace(/%/g, "") ?? "";
       const v = Number(raw);
       if (!Number.isFinite(v) || q.expectedPercent === undefined) return false;
-      return Math.abs(v - q.expectedPercent) < EPS;
+      const tol = q.level === "level2" ? PCT_EPS : EPS;
+      return Math.abs(v - q.expectedPercent) < tol;
     }
     default:
       return false;

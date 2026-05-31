@@ -16,6 +16,7 @@ import {
   formatAnswerChoice,
   generateDecimalRounding,
 } from "@/lib/questions/generators/decimalRounding";
+import { LEVEL_LABELS, type PracticeLevel } from "@/lib/questions/level";
 import {
   validateDecimalRounding,
   validateRoundingPlace,
@@ -23,9 +24,61 @@ import {
 
 type Phase = "pick-digit" | "pick-answer" | "done";
 
-export function DecimalRoundingPractice() {
+function AnswerChoiceGrid({
+  choices,
+  roundPlace,
+  selectedAnswer,
+  submitted,
+  answerCorrect,
+  correctRounded,
+  onSelect,
+}: {
+  choices: number[];
+  roundPlace: import("@/lib/math/rounding").RoundPlace;
+  selectedAnswer: number | null;
+  submitted: boolean;
+  answerCorrect: boolean;
+  correctRounded: number;
+  onSelect: (v: number) => void;
+}) {
+  return (
+    <div className="grid w-full max-w-lg grid-cols-2 gap-3" role="group" aria-label="Rounded answer choices">
+      {choices.map((choice, idx) => {
+        const isSel = selectedAnswer === choice;
+        const isCorrectChoice = submitted && Math.abs(choice - correctRounded) < 1e-9;
+        const isWrongSel = submitted && isSel && !answerCorrect;
+        return (
+          <button
+            key={`${idx}-${formatAnswerChoice(choice, roundPlace)}`}
+            type="button"
+            disabled={submitted}
+            onClick={() => onSelect(choice)}
+            className={`rounded-xl border-2 px-4 py-3 text-lg font-semibold tabular-nums transition ${
+              isCorrectChoice
+                ? "border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
+                : isWrongSel
+                  ? "border-rose-500 bg-rose-50 text-rose-900 dark:bg-rose-950 dark:text-rose-100"
+                  : isSel
+                    ? "border-sky-500 bg-sky-50 text-sky-900 dark:bg-sky-950 dark:text-sky-100"
+                    : "border-zinc-200 bg-white text-zinc-900 hover:border-sky-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
+            } disabled:cursor-default`}
+            aria-pressed={isSel}
+          >
+            {formatAnswerChoice(choice, roundPlace)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+export function DecimalRoundingPractice({
+  level = "foundation",
+}: {
+  level?: PracticeLevel;
+}) {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
-  const q = useMemo(() => generateDecimalRounding(seed), [seed]);
+  const q = useMemo(() => generateDecimalRounding(seed, level), [seed, level]);
 
   const [phase, setPhase] = useState<Phase>("pick-digit");
   const [selectedPlace, setSelectedPlace] = useState<DecimalPlace | null>(null);
@@ -35,18 +88,18 @@ export function DecimalRoundingPractice() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const { streak, bump } = usePracticeStreak("p6-streak-decimal-rounding");
+  const { streak, bump } = usePracticeStreak(`p6-streak-decimal-rounding-${level}`);
 
+  const isLevel2 = level === "level2";
   const { columns } = parseDecimalPlaces(q.value, q.sourceDp);
-  const selectable = selectableRoundingColumns(columns);
+  const selectable = selectableRoundingColumns(columns, level);
 
   const answerCorrect =
     selectedAnswer !== null ? validateDecimalRounding(q, selectedAnswer) : false;
-  const fullyCorrect = placeCorrect && answerCorrect;
+  const fullyCorrect = isLevel2 ? answerCorrect : placeCorrect && answerCorrect;
 
   const nextDigit = nextDigitForRounding(q.value, q.roundPlace);
   const targetPlace = roundPlaceToColumn(q.roundPlace);
-
   const chartStep: 1 | 2 = phase === "pick-digit" ? 1 : 2;
   const showHighlights = placeCorrect && !submitted;
 
@@ -61,7 +114,7 @@ export function DecimalRoundingPractice() {
   function handleCheckAnswer() {
     if (selectedAnswer === null) return;
     const ok = validateDecimalRounding(q, selectedAnswer);
-    bump(ok && placeCorrect);
+    bump(isLevel2 ? ok : ok && placeCorrect);
     setSubmitted(true);
     setPhase("done");
   }
@@ -81,15 +134,68 @@ export function DecimalRoundingPractice() {
     setSelectedPlace(null);
   }
 
+  if (isLevel2) {
+    return (
+      <SkillShell
+        title={`Decimal rounding · ${LEVEL_LABELS[level]}`}
+        subtitle="Pick the rounded answer. Watch for 9 carrying to the next place."
+        sidebar={
+          <div className="flex flex-col gap-4">
+            <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">{q.prompt}</p>
+            <AnswerChoiceGrid
+              choices={q.answerChoices}
+              roundPlace={q.roundPlace}
+              selectedAnswer={selectedAnswer}
+              submitted={submitted}
+              answerCorrect={answerCorrect}
+              correctRounded={q.correctRounded}
+              onSelect={(v) => !submitted && setSelectedAnswer(v)}
+            />
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Streak: <strong>{streak}</strong>
+            </p>
+            <button
+              type="button"
+              onClick={submitted ? handleNext : handleCheckAnswer}
+              disabled={!submitted && selectedAnswer === null}
+              className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitted ? "Next question" : "Check"}
+            </button>
+            {submitted ? (
+              <div
+                role="status"
+                className={`rounded-xl border px-3 py-3 text-sm ${
+                  fullyCorrect
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100"
+                    : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
+                }`}
+              >
+                <p className="font-semibold">{fullyCorrect ? "Correct!" : "Not quite."}</p>
+                <p className="mt-2 text-zinc-800 dark:text-zinc-200">
+                  Answer: <strong>{formatAnswerChoice(q.correctRounded, q.roundPlace)}</strong>.
+                  The deciding digit was <strong>{nextDigit}</strong>. {roundingTip(q.roundPlace)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{roundingTip(q.roundPlace)}</p>
+            )}
+          </div>
+        }
+      />
+    );
+  }
+
   return (
     <SkillShell
-      title="Decimal rounding"
+      title={`Decimal rounding · ${LEVEL_LABELS[level]}`}
       subtitle="First find which place to round to, then choose the rounded number."
       visual={
         <div className="flex w-full flex-col items-center gap-10">
           <DecimalPlaceChart
             value={q.value}
             sourceDp={q.sourceDp}
+            level={level}
             step={chartStep}
             selectablePlaces={selectable}
             selectedPlace={selectedPlace}
@@ -105,41 +211,17 @@ export function DecimalRoundingPractice() {
           {phase === "pick-answer" || phase === "done" ? (
             <div className="w-full max-w-lg">
               <p className="mb-3 text-center text-sm font-medium text-zinc-600 dark:text-zinc-400">
-                Step 2: Pick the rounded answer (e.g. 3.47 — not just the one digit you tapped).
+                Step 2: Pick the rounded answer.
               </p>
-              <div
-                className="grid grid-cols-2 gap-3"
-                role="group"
-                aria-label="Rounded answer choices"
-              >
-                {q.answerChoices.map((choice, idx) => {
-                  const isSel = selectedAnswer === choice;
-                  const isCorrectChoice =
-                    submitted && Math.abs(choice - q.correctRounded) < 1e-9;
-                  const isWrongSel = submitted && isSel && !answerCorrect;
-
-                  return (
-                    <button
-                      key={`${idx}-${formatAnswerChoice(choice, q.roundPlace)}`}
-                      type="button"
-                      disabled={submitted}
-                      onClick={() => !submitted && setSelectedAnswer(choice)}
-                      className={`rounded-xl border-2 px-4 py-3 text-lg font-semibold tabular-nums transition ${
-                        isCorrectChoice
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100"
-                          : isWrongSel
-                            ? "border-rose-500 bg-rose-50 text-rose-900 dark:bg-rose-950 dark:text-rose-100"
-                            : isSel
-                              ? "border-sky-500 bg-sky-50 text-sky-900 dark:bg-sky-950 dark:text-sky-100"
-                              : "border-zinc-200 bg-white text-zinc-900 hover:border-sky-300 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-50"
-                      } disabled:cursor-default`}
-                      aria-pressed={isSel}
-                    >
-                      {formatAnswerChoice(choice, q.roundPlace)}
-                    </button>
-                  );
-                })}
-              </div>
+              <AnswerChoiceGrid
+                choices={q.answerChoices}
+                roundPlace={q.roundPlace}
+                selectedAnswer={selectedAnswer}
+                submitted={submitted}
+                answerCorrect={answerCorrect}
+                correctRounded={q.correctRounded}
+                onSelect={(v) => !submitted && setSelectedAnswer(v)}
+              />
             </div>
           ) : null}
         </div>
@@ -168,9 +250,8 @@ export function DecimalRoundingPractice() {
                 >
                   <p className="font-semibold">Not that digit.</p>
                   <p className="mt-2">
-                    Read the question again — does it say <strong>tenth</strong> or{" "}
-                    <strong>hundredth</strong> (or one vs two decimal places)? Tap the matching
-                    digit.
+                    Read the question again — match <strong>whole number</strong>,{" "}
+                    <strong>tenth</strong>, or <strong>hundredth</strong> to the correct digit.
                   </p>
                   <button
                     type="button"
@@ -190,18 +271,11 @@ export function DecimalRoundingPractice() {
             <>
               <button
                 type="button"
-                onClick={handleCheckAnswer}
-                disabled={selectedAnswer === null || submitted}
+                onClick={submitted ? handleNext : handleCheckAnswer}
+                disabled={!submitted && selectedAnswer === null}
                 className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Check
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-              >
-                Next question
+                {submitted ? "Next question" : "Check"}
               </button>
               {submitted ? (
                 <div
@@ -212,14 +286,11 @@ export function DecimalRoundingPractice() {
                       : "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-100"
                   }`}
                 >
-                  <p className="font-semibold">
-                    {fullyCorrect ? "Correct!" : "Not quite."}
-                  </p>
+                  <p className="font-semibold">{fullyCorrect ? "Correct!" : "Not quite."}</p>
                   <p className="mt-2 text-zinc-800 dark:text-zinc-200">
                     Round to the <strong>{PLACE_LABELS[targetPlace]}</strong> →{" "}
                     <strong>{formatAnswerChoice(q.correctRounded, q.roundPlace)}</strong>.
-                    Deciding digit:{" "}
-                    <strong>{nextDigit}</strong>. {roundingTip(q.roundPlace)}
+                    Deciding digit: <strong>{nextDigit}</strong>. {roundingTip(q.roundPlace)}
                   </p>
                 </div>
               ) : (

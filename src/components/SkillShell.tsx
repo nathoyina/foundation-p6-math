@@ -9,9 +9,11 @@ export function SkillShell({
 }: {
   title: string;
   subtitle?: string;
-  visual: ReactNode;
+  visual?: ReactNode;
   sidebar: ReactNode;
 }) {
+  const compact = visual == null;
+
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-amber-50/80 via-white to-white dark:from-zinc-950 dark:via-black dark:to-black">
       <header className="border-b border-amber-200/80 bg-white/90 px-4 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
@@ -35,20 +37,28 @@ export function SkillShell({
           </div>
         </div>
       </header>
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-4 py-6 lg:flex-row lg:items-start">
-        <section
-          aria-labelledby="visual-heading"
-          className="flex min-h-[42vh] flex-1 flex-col justify-center rounded-2xl border border-amber-100 bg-white/90 p-5 shadow-md shadow-amber-100/40 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none lg:min-h-[min(72vh,840px)]"
-        >
-          <h2 id="visual-heading" className="sr-only">
-            Visual model
-          </h2>
-          {visual}
-        </section>
-        <aside className="w-full shrink-0 rounded-2xl border border-amber-100 bg-white/95 p-5 shadow-md shadow-amber-100/30 dark:border-zinc-800 dark:bg-zinc-950 lg:w-[400px]">
-          {sidebar}
-        </aside>
-      </div>
+      {compact ? (
+        <div className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
+          <main className="rounded-2xl border border-amber-100 bg-white/95 p-5 shadow-md shadow-amber-100/30 dark:border-zinc-800 dark:bg-zinc-950">
+            {sidebar}
+          </main>
+        </div>
+      ) : (
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-4 py-6 lg:flex-row lg:items-start">
+          <section
+            aria-labelledby="visual-heading"
+            className="flex min-h-[42vh] flex-1 flex-col justify-center rounded-2xl border border-amber-100 bg-white/90 p-5 shadow-md shadow-amber-100/40 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-none lg:min-h-[min(72vh,840px)]"
+          >
+            <h2 id="visual-heading" className="sr-only">
+              Visual model
+            </h2>
+            {visual}
+          </section>
+          <aside className="w-full shrink-0 rounded-2xl border border-amber-100 bg-white/95 p-5 shadow-md shadow-amber-100/30 dark:border-zinc-800 dark:bg-zinc-950 lg:w-[400px]">
+            {sidebar}
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   fractionsEqual,
   gcd,
+  improperToMixed,
   mixedToImproper,
   simplify,
 } from "./fractions";
@@ -29,5 +30,11 @@ describe("fractionsEqual", () => {
 describe("mixedToImproper", () => {
   it("converts mixed numbers", () => {
     expect(mixedToImproper(2, 3, 4)).toEqual({ num: 11, den: 4 });
+  });
+});
+
+describe("improperToMixed", () => {
+  it("converts improper fractions", () => {
+    expect(improperToMixed(11, 4)).toEqual({ whole: 2, num: 3, den: 4 });
   });
 });

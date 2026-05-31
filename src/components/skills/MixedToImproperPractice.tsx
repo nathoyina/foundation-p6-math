@@ -4,107 +4,204 @@ import { useMemo, useState } from "react";
 import { SkillShell } from "@/components/SkillShell";
 import { MixedFractionMath } from "@/components/math/MixedFractionMath";
 import { MixedFractionCircles } from "@/components/visuals/MixedFractionCircles";
+import { ImproperFractionLabel } from "@/components/visuals/ImproperFractionLabel";
 import { usePracticeStreak } from "@/hooks/usePracticeStreak";
 import { formatFraction, simplify } from "@/lib/math/fractions";
 import { generateMixedToImproper } from "@/lib/questions/generators/mixedToImproper";
-import { parseFractionInput, validateMixedToImproper } from "@/lib/questions/validators";
+import { LEVEL_LABELS, type PracticeLevel } from "@/lib/questions/level";
+import {
+  parseFractionInput,
+  validateImproperToMixed,
+  validateMixedToImproper,
+} from "@/lib/questions/validators";
 
-export function MixedToImproperPractice() {
+export function MixedToImproperPractice({
+  level = "foundation",
+}: {
+  level?: PracticeLevel;
+}) {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
-  const q = useMemo(() => generateMixedToImproper(seed), [seed]);
+  const q = useMemo(() => generateMixedToImproper(seed, level), [seed, level]);
+
+  const [wholeStr, setWholeStr] = useState("");
   const [numStr, setNumStr] = useState("");
   const [denStr, setDenStr] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const { streak, bump } = usePracticeStreak("p6-streak-mixed-improper");
+
+  const streakKey = `p6-streak-mixed-improper-${level}`;
+  const { streak, bump } = usePracticeStreak(streakKey);
+
+  const isImproperToMixed = q.direction === "improper-to-mixed";
+  const improperNum = q.improperNum ?? q.answer.num;
+  const improperDen = q.improperDen ?? q.answer.den;
 
   const parsed = parseFractionInput(numStr, denStr);
-  const correct = parsed ? validateMixedToImproper(q, parsed) : false;
+  const correct = isImproperToMixed
+    ? validateImproperToMixed(q, wholeStr, numStr, denStr)
+    : parsed
+      ? validateMixedToImproper(q, parsed)
+      : false;
 
   function handleCheck() {
-    const p = parseFractionInput(numStr, denStr);
-    if (!p) return;
-    bump(validateMixedToImproper(q, p));
+    const ok = isImproperToMixed
+      ? validateImproperToMixed(q, wholeStr, numStr, denStr)
+      : (() => {
+          const p = parseFractionInput(numStr, denStr);
+          return p ? validateMixedToImproper(q, p) : false;
+        })();
+    bump(ok);
     setSubmitted(true);
   }
 
   function handleNext() {
     setSeed((s) => s + 7919);
+    setWholeStr("");
     setNumStr("");
     setDenStr("");
     setSubmitted(false);
   }
 
   const ans = simplify(q.answer);
+  const isLevel2 = level === "level2";
+
+  const questionDisplay = isImproperToMixed ? (
+    <span className="text-2xl font-bold tabular-nums text-amber-900 dark:text-amber-100">
+      {formatFraction({ num: improperNum, den: improperDen })}
+    </span>
+  ) : (
+    <MixedFractionMath
+      whole={q.whole}
+      numerator={q.numerator}
+      denominator={q.denominator}
+      size="lg"
+      className="text-zinc-900 dark:text-zinc-50"
+    />
+  );
 
   return (
     <SkillShell
-      title="Mixed to improper fraction"
-      subtitle="Each whole is a full circle; the last circle shows the leftover parts."
+      title={`Fractions · ${LEVEL_LABELS[level]}`}
+      subtitle={
+        isLevel2
+          ? "Convert using the numbers shown."
+          : isImproperToMixed
+            ? "Count the wholes in the diagram, then write the mixed number."
+            : "Each whole is a full circle; the last circle shows the leftover parts."
+      }
       visual={
-        <MixedFractionCircles
-          whole={q.whole}
-          numerator={q.numerator}
-          denominator={q.denominator}
-          animateBurst={submitted && correct}
-        />
+        isLevel2 ? undefined : (
+          <div className="flex flex-col items-center gap-6">
+            {isImproperToMixed ? (
+              <ImproperFractionLabel num={improperNum} den={improperDen} />
+            ) : null}
+            <MixedFractionCircles
+              whole={q.whole}
+              numerator={q.numerator}
+              denominator={q.denominator}
+              animateBurst={submitted && correct}
+            />
+          </div>
+        )
       }
       sidebar={
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3">
+            {isLevel2 ? (
+              <div className="flex flex-wrap items-center gap-3">
+                {questionDisplay}
+              </div>
+            ) : null}
             <p className="text-base text-zinc-700 dark:text-zinc-300">{q.prompt}</p>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-4 dark:border-zinc-600 dark:bg-zinc-900/60">
-              <MixedFractionMath
-                whole={q.whole}
-                numerator={q.numerator}
-                denominator={q.denominator}
-                size="lg"
-                className="text-zinc-900 dark:text-zinc-50"
-              />
-            </div>
+            {!isImproperToMixed && !isLevel2 ? (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-4 dark:border-zinc-600 dark:bg-zinc-900/60">
+                <MixedFractionMath
+                  whole={q.whole}
+                  numerator={q.numerator}
+                  denominator={q.denominator}
+                  size="lg"
+                  className="text-zinc-900 dark:text-zinc-50"
+                />
+              </div>
+            ) : null}
           </div>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Streak: <strong>{streak}</strong>
           </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Numerator
-              <input
-                inputMode="numeric"
-                value={numStr}
-                onChange={(e) => !submitted && setNumStr(e.target.value)}
-                disabled={submitted}
-                className="w-28 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
-              />
-            </label>
-            <span className="pb-2 text-lg font-semibold text-zinc-500">/</span>
-            <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Denominator
-              <input
-                inputMode="numeric"
-                value={denStr}
-                onChange={(e) => !submitted && setDenStr(e.target.value)}
-                disabled={submitted}
-                className="w-28 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleCheck}
-              disabled={submitted || !numStr.trim() || !denStr.trim()}
-              className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Check
-            </button>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Next question
-            </button>
-          </div>
+
+          {isImproperToMixed ? (
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Whole
+                <input
+                  inputMode="numeric"
+                  value={wholeStr}
+                  onChange={(e) => !submitted && setWholeStr(e.target.value)}
+                  disabled={submitted}
+                  className="w-24 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Numerator
+                <input
+                  inputMode="numeric"
+                  value={numStr}
+                  onChange={(e) => !submitted && setNumStr(e.target.value)}
+                  disabled={submitted}
+                  className="w-24 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+              <span className="pb-2 text-lg font-semibold text-zinc-500">/</span>
+              <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Denominator
+                <input
+                  inputMode="numeric"
+                  value={denStr}
+                  onChange={(e) => !submitted && setDenStr(e.target.value)}
+                  disabled={submitted}
+                  className="w-24 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Numerator
+                <input
+                  inputMode="numeric"
+                  value={numStr}
+                  onChange={(e) => !submitted && setNumStr(e.target.value)}
+                  disabled={submitted}
+                  className="w-28 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+              <span className="pb-2 text-lg font-semibold text-zinc-500">/</span>
+              <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Denominator
+                <input
+                  inputMode="numeric"
+                  value={denStr}
+                  onChange={(e) => !submitted && setDenStr(e.target.value)}
+                  disabled={submitted}
+                  className="w-28 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+                />
+              </label>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={submitted ? handleNext : handleCheck}
+            disabled={
+              !submitted &&
+              (isImproperToMixed
+                ? !wholeStr.trim() || !numStr.trim() || !denStr.trim()
+                : !numStr.trim() || !denStr.trim())
+            }
+            className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitted ? "Next question" : "Check"}
+          </button>
+
           {submitted ? (
             <div
               role="status"
@@ -115,16 +212,29 @@ export function MixedToImproperPractice() {
               }`}
             >
               <p className="font-semibold">{correct ? "Correct!" : "Let’s fix it."}</p>
-              <p className="mt-2 text-zinc-800 dark:text-zinc-200">
-                Answer: <strong>{formatFraction(ans)}</strong>. Think:{" "}
-                <strong>{q.whole}</strong> wholes × <strong>{q.denominator}</strong> parts, plus{" "}
-                <strong>{q.numerator}</strong> extra parts → numerator{" "}
-                <strong>{q.whole * q.denominator + q.numerator}</strong>.
-              </p>
+              {isImproperToMixed && q.answerMixed ? (
+                <p className="mt-2 text-zinc-800 dark:text-zinc-200">
+                  Answer:{" "}
+                  <strong>
+                    {q.answerMixed.whole} {q.answerMixed.num}/{q.answerMixed.den}
+                  </strong>
+                  . There are <strong>{q.answerMixed.whole}</strong> full groups of{" "}
+                  <strong>{q.answerMixed.den}</strong> in {improperNum}/{improperDen}.
+                </p>
+              ) : (
+                <p className="mt-2 text-zinc-800 dark:text-zinc-200">
+                  Answer: <strong>{formatFraction(ans)}</strong>. Think:{" "}
+                  <strong>{q.whole}</strong> wholes × <strong>{q.denominator}</strong> parts, plus{" "}
+                  <strong>{q.numerator}</strong> extra parts → numerator{" "}
+                  <strong>{q.whole * q.denominator + q.numerator}</strong>.
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Tip: multiply the whole number by the denominator, then add the numerator.
+              {isImproperToMixed
+                ? "Tip: divide the numerator by the denominator to find the whole and remainder."
+                : "Tip: multiply the whole number by the denominator, then add the numerator."}
             </p>
           )}
         </div>

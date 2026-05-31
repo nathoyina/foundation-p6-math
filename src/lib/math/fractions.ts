@@ -46,3 +46,13 @@ export function formatFraction(f: Fraction): string {
   if (s.den === 1) return String(s.num);
   return `${s.num}/${s.den}`;
 }
+
+export function improperToMixed(
+  num: number,
+  den: number,
+): { whole: number; num: number; den: number } {
+  if (den <= 0) throw new Error("Invalid denominator");
+  const whole = Math.floor(num / den);
+  const rem = num % den;
+  return { whole, num: rem, den };
+}

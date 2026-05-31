@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SkillShell } from "@/components/SkillShell";
+import { FractionBar } from "@/components/visuals/FractionBar";
 import { PercentGrid } from "@/components/visuals/PercentGrid";
 import { usePracticeStreak } from "@/hooks/usePracticeStreak";
 import { formatFraction, simplify } from "@/lib/math/fractions";
 import { generatePercentConvert } from "@/lib/questions/generators/percentConvert";
+import { LEVEL_LABELS, type PracticeLevel } from "@/lib/questions/level";
 import { validatePercentConvert } from "@/lib/questions/validators";
 import type { PercentMode } from "@/lib/questions/types";
 
@@ -16,17 +18,24 @@ const MODE_LABELS: Record<PercentMode, string> = {
   "fraction-to-pct": "Fraction → percent",
 };
 
-export function PercentConvertPractice() {
+export function PercentConvertPractice({
+  level = "foundation",
+}: {
+  level?: PracticeLevel;
+}) {
   const [mode, setMode] = useState<PercentMode>("pct-to-decimal");
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
-  const q = generatePercentConvert(seed, mode);
+  const q = useMemo(
+    () => generatePercentConvert(seed, mode, level),
+    [seed, mode, level],
+  );
 
   const [decimalStr, setDecimalStr] = useState("");
   const [percentStr, setPercentStr] = useState("");
   const [numStr, setNumStr] = useState("");
   const [denStr, setDenStr] = useState("");
   const [submitted, setSubmitted] = useState(false);
-  const { streak, bump } = usePracticeStreak("p6-streak-percent");
+  const { streak, bump } = usePracticeStreak(`p6-streak-percent-${level}`);
 
   const ok =
     submitted &&
@@ -67,56 +76,70 @@ export function PercentConvertPractice() {
     setSubmitted(false);
   }
 
-  /** Shaded amount matches the quantity (same as answer %) so it stays consistent across modes. */
-  const gridFill = q.percent;
-
+  const isLevel2 = level === "level2";
+  const gridFill = Math.min(100, Math.round(q.percent));
   const reveal = submitted;
-
   const decimalValue = q.expectedDecimal ?? q.percent / 100;
+  const pctDisplay = q.expectedPercent ?? q.percent;
+  const fracDisplay =
+    q.expectedFraction ??
+    (q.fractionParts ? simplify(q.fractionParts) : simplify({ num: q.percent, den: 100 }));
 
   return (
     <SkillShell
-      title="Percentages, decimals, and fractions"
-      subtitle="The hundred square shows parts out of 100."
+      title={`Percentages · ${LEVEL_LABELS[level]}`}
+      subtitle={
+        isLevel2
+          ? "Harder fractions, decimals over 1, and percentages above 100%."
+          : "The hundred square shows parts out of 100."
+      }
       visual={
+        isLevel2 ? undefined : (
         <div className="flex flex-col items-center gap-6">
-          <PercentGrid
-            percent={gridFill}
-            pulse={reveal && ok}
-            labelled={reveal}
-          />
+          {q.useFractionBar && q.fractionParts ? (
+            <FractionBar
+              numerator={q.fractionParts.num}
+              denominator={q.fractionParts.den}
+              labelled={reveal}
+            />
+          ) : (
+            <PercentGrid percent={gridFill} pulse={reveal && ok} labelled={reveal} />
+          )}
           {reveal ? (
             <div className="flex flex-wrap justify-center gap-4 text-center text-sm">
               <div className="rounded-xl bg-violet-100 px-4 py-2 font-semibold text-violet-900 dark:bg-violet-950 dark:text-violet-100">
-                {q.percent}%
+                {pctDisplay}%
               </div>
               <div className="rounded-xl bg-zinc-100 px-4 py-2 font-semibold text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
                 {decimalValue.toString()}
               </div>
               <div className="rounded-xl bg-emerald-100 px-4 py-2 font-semibold text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100">
-                {formatFraction(simplify({ num: q.percent, den: 100 }))}
+                {formatFraction(fracDisplay)}
               </div>
             </div>
           ) : null}
         </div>
+        )
       }
       sidebar={
         <div className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Practice type
-            <select
-              value={mode}
-              onChange={(e) => handleModeChange(e.target.value as PercentMode)}
-              disabled={submitted}
-              className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
-            >
-              {(Object.keys(MODE_LABELS) as PercentMode[]).map((m) => (
-                <option key={m} value={m}>
-                  {MODE_LABELS[m]}
-                </option>
-              ))}
-            </select>
-          </label>
+          {level === "foundation" ? (
+            <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Practice type
+              <select
+                value={mode}
+                onChange={(e) => handleModeChange(e.target.value as PercentMode)}
+                disabled={submitted}
+                className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
+              >
+                {(Object.keys(MODE_LABELS) as PercentMode[]).map((m) => (
+                  <option key={m} value={m}>
+                    {MODE_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">{q.prompt}</p>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             Streak: <strong>{streak}</strong>
@@ -130,7 +153,7 @@ export function PercentConvertPractice() {
                 value={decimalStr}
                 onChange={(e) => !submitted && setDecimalStr(e.target.value)}
                 disabled={submitted}
-                placeholder="e.g. 0.4"
+                placeholder={level === "level2" ? "e.g. 1.25" : "e.g. 0.4"}
                 className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
               />
             </label>
@@ -170,35 +193,26 @@ export function PercentConvertPractice() {
                 value={percentStr}
                 onChange={(e) => !submitted && setPercentStr(e.target.value)}
                 disabled={submitted}
-                placeholder="e.g. 40 or 40%"
+                placeholder="e.g. 40 or 37.5"
                 className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base dark:border-zinc-600 dark:bg-zinc-900"
               />
             </label>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleCheck}
-              disabled={
-                submitted ||
-                (q.mode === "pct-to-decimal" && !decimalStr.trim()) ||
+          <button
+            type="button"
+            onClick={submitted ? handleNext : handleCheck}
+            disabled={
+              !submitted &&
+              ((q.mode === "pct-to-decimal" && !decimalStr.trim()) ||
                 (q.mode === "pct-to-fraction" && (!numStr.trim() || !denStr.trim())) ||
                 ((q.mode === "decimal-to-pct" || q.mode === "fraction-to-pct") &&
-                  !percentStr.trim())
-              }
-              className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Check
-            </button>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="rounded-xl border border-zinc-300 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
-            >
-              Next question
-            </button>
-          </div>
+                  !percentStr.trim()))
+            }
+            className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitted ? "Next question" : "Check"}
+          </button>
 
           {submitted ? (
             <div
@@ -211,14 +225,18 @@ export function PercentConvertPractice() {
             >
               <p className="font-semibold">{ok ? "Well done!" : "Keep practising."}</p>
               <p className="mt-2 text-zinc-800 dark:text-zinc-200">
-                Same amount can be written as <strong>{q.percent}%</strong>, decimal{" "}
-                <strong>{decimalValue.toString()}</strong>, or fraction{" "}
-                <strong>{formatFraction(simplify({ num: q.percent, den: 100 }))}</strong>.
+                Same amount: <strong>{pctDisplay}%</strong>, decimal{" "}
+                <strong>{decimalValue.toString()}</strong>, fraction{" "}
+                <strong>{formatFraction(fracDisplay)}</strong>.
               </p>
             </div>
           ) : (
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Percent means “out of 100”. Match your answer to what you see in the grid.
+              {isLevel2
+                ? "Work from the numbers in the question."
+                : q.useFractionBar
+                  ? "Use the fraction bar to help you see the size of the fraction."
+                  : "Percent means “out of 100”. Match your answer to what you see in the grid."}
             </p>
           )}
         </div>

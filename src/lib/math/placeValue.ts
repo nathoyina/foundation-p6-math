@@ -1,21 +1,38 @@
 import type { RoundPlace } from "./rounding";
 
-export type DecimalPlace = "ones" | "tenths" | "hundredths" | "thousandths";
+export type DecimalPlace =
+  | "ones"
+  | "tenths"
+  | "hundredths"
+  | "thousandths"
+  | "tenThousandths";
 
 export const PLACE_LABELS: Record<DecimalPlace, string> = {
   ones: "Ones",
   tenths: "Tenths",
   hundredths: "Hundredths",
   thousandths: "Thousandths",
+  tenThousandths: "Ten-thousandths",
 };
 
 export function roundPlaceToColumn(place: RoundPlace): DecimalPlace {
-  return place === "tenth" ? "tenths" : "hundredths";
+  switch (place) {
+    case "whole":
+      return "ones";
+    case "tenth":
+      return "tenths";
+    case "hundredth":
+      return "hundredths";
+    case "thousandth":
+      return "thousandths";
+  }
 }
 
 export function columnToRoundPlace(col: DecimalPlace): RoundPlace | null {
+  if (col === "ones") return "whole";
   if (col === "tenths") return "tenth";
   if (col === "hundredths") return "hundredth";
+  if (col === "thousandths") return "thousandth";
   return null;
 }
 
@@ -24,6 +41,7 @@ export function decidingColumn(target: DecimalPlace): DecimalPlace | null {
   if (target === "ones") return "tenths";
   if (target === "tenths") return "hundredths";
   if (target === "hundredths") return "thousandths";
+  if (target === "thousandths") return "tenThousandths";
   return null;
 }
 
@@ -31,9 +49,7 @@ export function parseDecimalPlaces(
   value: number,
   sourceDp: number,
 ): {
-  /** Full digits before the decimal point (e.g. "12" for 12.333). */
   wholePart: string;
-  /** Fractional place columns shown after the decimal point. */
   columns: DecimalPlace[];
   digits: Partial<Record<DecimalPlace, string>>;
 } {
@@ -55,11 +71,30 @@ export function parseDecimalPlaces(
     columns.push("thousandths");
     digits.thousandths = frac[2];
   }
+  if (frac.length >= 4) {
+    columns.push("tenThousandths");
+    digits.tenThousandths = frac[3];
+  }
 
   return { wholePart: whole, columns, digits };
 }
 
-/** Fractional columns a student may choose as the rounding target. */
-export function selectableRoundingColumns(columns: DecimalPlace[]): DecimalPlace[] {
-  return columns.filter((c) => c === "tenths" || c === "hundredths");
+export function selectableRoundingColumns(
+  columns: DecimalPlace[],
+  level: "foundation" | "level2",
+): DecimalPlace[] {
+  if (level === "foundation") {
+    return columns.filter((c) => c === "tenths" || c === "hundredths");
+  }
+  const selectable: DecimalPlace[] = ["ones"];
+  for (const c of columns) {
+    if (
+      c === "tenths" ||
+      c === "hundredths" ||
+      c === "thousandths"
+    ) {
+      selectable.push(c);
+    }
+  }
+  return selectable;
 }
